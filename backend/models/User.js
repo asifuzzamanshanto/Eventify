@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -19,12 +20,16 @@ const userSchema = new mongoose.Schema(
 
     role: { type: String, enum: ['Student', 'Organizer', 'Super Admin'], required: true },
 
-    // ⬅️ add "Rejected" so Super Admin can reject organizer applications
     status: {
       type: String,
       enum: ['Pending', 'Approved', 'Rejected'],
       default: 'Approved',
     },
+
+    // Profile extras
+    bio: { type: String, default: '' },               // 👈 NEW
+    avatarUrl: { type: String, default: '' },         // 👈 NEW
+    avatarFileId: { type: String, default: '' },      // 👈 NEW
 
     // Student-only
     department: {
@@ -65,8 +70,8 @@ const userSchema = new mongoose.Schema(
     clubLogoUrl: { type: String, default: '' },
     clubLogoFileId: { type: String, default: '' },
 
-    // ⬇️ moderation/audit fields (optional, used when approving/rejecting)
-    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Super Admin who acted
+    // Moderation/audit
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: { type: Date },
     rejectionReason: { type: String },
   },
@@ -92,10 +97,12 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Hide password when converting to JSON
+// Hide sensitive/internal fields when converting to JSON
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.avatarFileId;   // 👈 hide storage file IDs
+  delete obj.clubLogoFileId; // 👈 hide storage file IDs
   return obj;
 };
 

@@ -1,19 +1,39 @@
+// backend/routes/users.js
 const express = require('express');
 const router = express.Router();
+
 const { protect } = require('../middleware/authMiddleware');
-const { updateClubLogo } = require('../controllers/userController');
+const { updateMe, updateImageAsset } = require('../controllers/userController');
 const { makeUploader } = require('../middleware/upload');
-const { validateExactImage } = require('../middleware/validateImage');
 
-// 2 MB max, exactly 1080x1080
-const uploadLogo = makeUploader(2 * 1024 * 1024);
+// Single 5 MB uploader for all profile images
+const upload5MB = makeUploader(5 * 1024 * 1024);
 
+// Helper to tag upload target for the unified controller
+const setUploadTarget = (target) => (req, _res, next) => {
+  req.uploadTarget = target; // 'avatar' | 'club-logo'
+  next();
+};
+
+// Text profile updates
+router.put('/me', protect, updateMe);
+
+// Avatar upload (client can crop; server will auto-square/resize)
+router.patch(
+  '/me/avatar',
+  protect,
+  setUploadTarget('avatar'),
+  upload5MB.single('avatar'),
+  updateImageAsset
+);
+
+// Organizer club logo upload (client can crop; server will auto-square/resize)
 router.patch(
   '/:id/club-logo',
   protect,
-  uploadLogo.single('logo'),
-  validateExactImage(1080, 1080),
-  updateClubLogo
+  setUploadTarget('club-logo'),
+  upload5MB.single('logo'),
+  updateImageAsset
 );
 
 module.exports = router;
