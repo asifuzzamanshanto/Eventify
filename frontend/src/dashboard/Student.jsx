@@ -13,7 +13,7 @@ export default function Student() {
     { label: "My Events",  href: "/student/myevents",  icon: <IconBrandTabler className="h-5 w-5 shrink-0" /> },
     { label: "All Events", href: "/student/allevents", icon: <IconUserBolt className="h-5 w-5 shrink-0" /> },
     { label: "Profile",    href: "/student/myprofile", icon: <IconSettings className="h-5 w-5 shrink-0" /> },
-    { label: "Logout",     href: "/",                   icon: <IconArrowLeft className="h-5 w-5 shrink-0" /> },
+    { label: "Home",     href: "/",                   icon: <IconArrowLeft className="h-5 w-5 shrink-0" /> },
   ];
 
   const user = {

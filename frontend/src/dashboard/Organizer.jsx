@@ -15,7 +15,7 @@ export default function Organizer() {
     { label: "My Posted Events", href: "/organizers/myevents", icon: <IconBrandTabler className="h-5 w-5 shrink-0" /> },
     { label: "All Events", href: "/organizers/allevents", icon: <IconUserBolt className="h-5 w-5 shrink-0" /> },
     { label: "Profile", href: "/organizers/myprofile", icon: <IconSettings className="h-5 w-5 shrink-0" /> },
-    { label: "Logout", href: "/", icon: <IconArrowLeft className="h-5 w-5 shrink-0" /> },
+    { label: "Home", href: "/", icon: <IconArrowLeft className="h-5 w-5 shrink-0" /> },
   ];
 
   // (Optional) replace with authed organizer’s info later

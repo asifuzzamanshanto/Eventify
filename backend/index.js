@@ -60,9 +60,10 @@ app.use(
 const authRoutes = require('./routes/auth');
 const superadminRoutes = require('./routes/superadminRoutes');
 const registrationRoutes = require('./routes/registrations');
-const chatbotRoutes = require('./routes/chatbot');
 const certificateRoutes = require('./routes/certificates');
 const userRoutes = require('./routes/users');
+
+const chatbotRoutes = require('./routes/chatbot');
 
 app.get('/', (req, res) => {
   res.send('Eventify API is running!');
@@ -72,9 +73,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/events', require('./routes/events'));
 app.use('/api/registrations', registrationRoutes);
-app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/users', userRoutes);
+
+app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/chat', chatbotRoutes);
+app.use('/api/ai', require('./routes/ai'));
 
 // --- Mongo & Server --- //
 let server;

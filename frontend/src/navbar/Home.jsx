@@ -1,3 +1,4 @@
+// frontend/src/navbar/Home.jsx
 "use client";
 
 import React from "react";
@@ -22,7 +23,7 @@ import {
    Home Page
 ----------------------------------*/
 export default function Home() {
-  // ✅ ADDED: minimal state to control chatbot visibility
+  // chatbot visibility
   const [chatOpen, setChatOpen] = React.useState(false);
 
   return (
@@ -38,7 +39,7 @@ export default function Home() {
               <span className="mt-2 block bg-gradient-to-r from-indigo-300 via-sky-200 to-fuchsia-300 bg-clip-text text-balance text-5xl font-bold text-transparent sm:text-6xl md:text-7xl lg:text-8xl">
                 All your club events in one place — Eventify
               </span>{" "}
-              <br></br>
+              <br />
             </PlainTitle>
 
             {/* Sub-copy */}
@@ -51,7 +52,7 @@ export default function Home() {
               <h2 className="mb-6 text-center text-xl font-regular text-white/90 sm:text-3xl">
                 Join thousands of students discovering and attending campus events with ease.
               </h2>{" "}
-              <br></br>
+              <br />
             </motion.p>
 
             {/* CTAs */}
@@ -105,11 +106,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ✅ ADDED: floating button + chatbot panel (non-intrusive) */}
+        {/* Floating button + chatbot panel (non-intrusive) */}
         <ChatbotFAB onClick={() => setChatOpen(true)} />
         <FAQChatbot open={chatOpen} onClose={() => setChatOpen(false)} />
-        {/* ✅ END additions */}
-
       </Layout>
     </main>
   );
@@ -150,7 +149,7 @@ function IconRing() {
     <div className="relative mx-auto mt-12 aspect-square w-full max-w-[700px]">
       {/* Outer glow ring */}
       <div className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-[radial-gradient(circle_at_center,rgba(99,102,241,.15)_0%,transparent_60%)]" />
-      <h2 className="mb-6 text-center text-xl font-regular text-white/90 sm:text-3xl"></h2> <br></br>
+      <h2 className="mb-6 text-center text-xl font-regular text-white/90 sm:text-3xl"></h2> <br />
       {/* Center badge - solid */}
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
@@ -194,7 +193,7 @@ function IconRing() {
    Infinite Moving Cards (images)
    — JS/JSX version adapted from Aceternity UI
 ----------------------------------*/
-function cn(...classes) {
+function cnJoin(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
@@ -228,34 +227,48 @@ function InfiniteMovingCards({
   }
   function getDirection() {
     if (!containerRef.current) return;
-    containerRef.current.style.setProperty("--animation-direction", direction === "left" ? "forwards" : "reverse");
+    containerRef.current.style.setProperty(
+      "--animation-direction",
+      direction === "left" ? "forwards" : "reverse"
+    );
   }
   function getSpeed() {
     if (!containerRef.current) return;
-    containerRef.current.style.setProperty("--animation-duration", speed === "fast" ? "20s" : speed === "normal" ? "40s" : "80s");
+    containerRef.current.style.setProperty(
+      "--animation-duration",
+      speed === "fast" ? "20s" : speed === "normal" ? "40s" : "80s"
+    );
   }
 
   return (
     <div
       ref={containerRef}
-      className={cn(
+      className={cnJoin(
         "scroller relative z-20 mx-auto max-w-6xl overflow-hidden [mask-image:linear-gradient(to_right,transparent,white_12%,white_88%,transparent)]",
         className
       )}
     >
       <ul
         ref={scrollerRef}
-        className={cn(
+        className={cnJoin(
           "flex w-max min-w-full shrink-0 flex-nowrap gap-6 py-6",
           start && "animate-scroll",
           pauseOnHover && "hover:[animation-play-state:paused]"
         )}
       >
         {items.map((item, idx) => (
-          <li key={idx} className="relative w-[220px] max-w-full shrink-0 rounded-2xl border border-neutral-800 bg-neutral-900/80 px-4 py-4">
+          <li
+            key={idx}
+            className="relative w-[220px] max-w-full shrink-0 rounded-2xl border border-neutral-800 bg-neutral-900/80 px-4 py-4"
+          >
             <div className="aspect-[4/3] w-full overflow-hidden rounded-xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.src} alt={item.alt || `image-${idx + 1}`} className="h-full w-full object-contain" loading="lazy" />
+              <img
+                src={item.src}
+                alt={item.alt || `image-${idx + 1}`}
+                className="h-full w-full object-contain"
+                loading="lazy"
+              />
             </div>
           </li>
         ))}
@@ -300,22 +313,44 @@ function BackgroundFX() {
 
       <style jsx global>{`
         @keyframes float-slow {
-          0% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(20px, -10px) scale(1.05); }
-          100% { transform: translate(0, 0) scale(1); }
+          0% {
+            transform: translate(0, 0) scale(1);
+          }
+          50% {
+            transform: translate(20px, -10px) scale(1.05);
+          }
+          100% {
+            transform: translate(0, 0) scale(1);
+          }
         }
         @keyframes float-slower {
-          0% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(-16px, 12px) scale(1.07); }
-          100% { transform: translate(0, 0) scale(1); }
+          0% {
+            transform: translate(0, 0) scale(1);
+          }
+          50% {
+            transform: translate(-16px, 12px) scale(1.07);
+          }
+          100% {
+            transform: translate(0, 0) scale(1);
+          }
         }
         @keyframes rotate-slower {
-          from { transform: translate(-50%, -50%) rotate(0deg); }
-          to { transform: translate(-50%, -50%) rotate(360deg); }
+          from {
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+          to {
+            transform: translate(-50%, -50%) rotate(360deg);
+          }
         }
-        .animate-float-slow { animation: float-slow 14s ease-in-out infinite; }
-        .animate-float-slower { animation: float-slower 22s ease-in-out infinite; }
-        .animate-rotate-slower { animation: rotate-slower 36s linear infinite; }
+        .animate-float-slow {
+          animation: float-slow 14s ease-in-out infinite;
+        }
+        .animate-float-slower {
+          animation: float-slower 22s ease-in-out infinite;
+        }
+        .animate-rotate-slower {
+          animation: rotate-slower 36s linear infinite;
+        }
       `}</style>
     </>
   );
@@ -342,24 +377,65 @@ function ChatbotFAB({ onClick }) {
 
 /* --------------------------------
    FAQ Chatbot Panel (glass card)
-   - pre-made FAQs with quick chips
-   - lives in Home.jsx but isolated
+   - wired to backend LLM at POST /api/chat/ask
+   - falls back to local FAQs if backend not available
 ----------------------------------*/
 function FAQChatbot({ open, onClose }) {
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState([
-    { from: "bot", text: "Hi! I’m Eventify Assistant. Ask me about creating events, clubs, RBAC, analytics, secure login, refunds, or reminders." },
+    {
+      from: "bot",
+      text:
+        "Hi! I’m Eventify Assistant. Ask me about creating events, clubs, RBAC, analytics, secure login, refunds, reminders — or say things like “tech events this week”, “closest events to BRACU”, or “AI workshops tomorrow”.",
+    },
   ]);
+  const [busy, setBusy] = React.useState(false);
 
+  // Optional: local fallback FAQs if LLM route not available
   const FAQS = React.useMemo(
     () => [
-      { q: "How do I create an event?", k: ["create event", "add event"], a: "Go to **Create an event**, fill in title, time, venue and visibility. You can add tickets & a poster. Hit **Publish** to make it live." },
-      { q: "How can I join a club?", k: ["join club", "club join"], a: "Open **Associated Clubs**, pick a club, then tap **Follow** or **Join**. Some clubs approve requests; you’ll get a notification." },
-      { q: "Do you support role-based access control?", k: ["rbac", "role-based", "roles"], a: "Yes. Eventify uses **RBAC** with roles like **Owner**, **Admin**, **Editor**, **Member**, **Viewer**. Permissions are scoped to clubs/events." },
-      { q: "Is login secure?", k: ["secure login", "security", "login"], a: "We use hashed credentials, rate limiting, and optional **2FA** for organizers. OAuth via Google/University SSO may be enabled." },
-      { q: "Can I analyze event performance?", k: ["analysis", "analytics", "insights"], a: "Use **Event analysis** to see registrations, check-ins, invite CTR, and demographics (where available). Export CSV supported." },
-      { q: "How do reminders work?", k: ["reminder", "notifications"], a: "After following a club or registering, reminders are sent by email & in‑app (24h and 1h before). Manage preferences in Settings." },
-      { q: "Refunds & tickets", k: ["refund", "ticket", "payment"], a: "Refunds depend on organizer policy. If enabled, tap **Request refund** on your ticket page. For payment issues, contact the host or support." },
+      {
+        q: "How do I create an event?",
+        k: ["create event", "add event"],
+        a:
+          "Go to **Create an event**, fill in title, time, venue and visibility. You can add tickets & a poster. Hit **Publish** to make it live.",
+      },
+      {
+        q: "How can I join a club?",
+        k: ["join club", "club join"],
+        a:
+          "Open **Associated Clubs**, pick a club, then tap **Follow** or **Join**. Some clubs approve requests; you’ll get a notification.",
+      },
+      {
+        q: "Do you support role-based access control?",
+        k: ["rbac", "role-based", "roles"],
+        a:
+          "Yes. Eventify uses **RBAC** with roles like **Owner**, **Admin**, **Editor**, **Member**, **Viewer**. Permissions are scoped to clubs/events.",
+      },
+      {
+        q: "Is login secure?",
+        k: ["secure login", "security", "login"],
+        a:
+          "We use hashed credentials, rate limiting, and optional **2FA** for organizers. OAuth via Google/University SSO may be enabled.",
+      },
+      {
+        q: "Can I analyze event performance?",
+        k: ["analysis", "analytics", "insights"],
+        a:
+          "Use **Event analysis** to see registrations, check-ins, invite CTR, and demographics (where available). Export CSV supported.",
+      },
+      {
+        q: "How do reminders work?",
+        k: ["reminder", "notifications"],
+        a:
+          "After following a club or registering, reminders are sent by email & in-app (24h and 1h before). Manage preferences in Settings.",
+      },
+      {
+        q: "Refunds & tickets",
+        k: ["refund", "ticket", "payment"],
+        a:
+          "Refunds depend on organizer policy. If enabled, tap **Request refund** on your ticket page. For payment issues, contact the host or support.",
+      },
     ],
     []
   );
@@ -373,33 +449,79 @@ function FAQChatbot({ open, onClose }) {
     return inter / Math.sqrt(A.size * B.size);
   }
 
-  function findAnswer(text) {
+  function findLocalAnswer(text) {
     const t = (text || "").toLowerCase();
-    // keyword match
     for (const f of FAQS) if (f.k.some((kw) => t.includes(kw))) return f.a;
-    // fuzzy by question+keywords
     const scored = FAQS.map((f) => ({
       f,
       s: similarity(t, f.q + " " + f.k.join(" ")),
     })).sort((a, b) => b.s - a.s);
     return (scored[0]?.s || 0) > 0.2
       ? scored[0].f.a
-      : "I’m not fully sure. Try asking about events, clubs, RBAC, analytics, secure login, refunds, or reminders.";
+      : "I’m not fully sure. You can ask about events (e.g., “tech events this week”, “closest events to me”), clubs, RBAC, analytics, secure login, refunds, or reminders.";
   }
 
   function md(s = "") {
     return s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
 
-  const ask = (txt) => {
-    if (!txt.trim()) return;
-    setMessages((m) => [...m, { from: "user", text: txt }, { from: "bot", text: findAnswer(txt) }]);
+  // Call your backend to reach OpenAI/Gemini
+  async function askLLM(userText) {
+    const payload = { message: userText };
+    const res = await fetch("/api/chat/ask", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+
+    // Expected shape: { answer: string, suggestions?: Array<{title,date,location,url}> }
+    const data = await res.json();
+    let answer = data.answer || "";
+    const sugg = Array.isArray(data.suggestions) ? data.suggestions : [];
+
+    if (sugg.length) {
+      const list = sugg
+        .map(
+          (e) =>
+            `• ${e.title} — ${e.date ? new Date(e.date).toLocaleDateString() : ""}${
+              e.location ? ` @ ${e.location}` : ""
+            }${e.url ? `\n  ${e.url}` : ""}`
+        )
+        .join("\n");
+      answer += `\n\n**Suggested events:**\n${list}`;
+    }
+    return answer || "I couldn’t find an answer right now.";
+  }
+
+  const ask = async (txt) => {
+    const text = txt.trim();
+    if (!text) return;
+
+    // add user message
+    setMessages((m) => [...m, { from: "user", text }]);
+    setBusy(true);
+
+    try {
+      // Try LLM backend first
+      const reply = await askLLM(text);
+      setMessages((m) => [...m, { from: "bot", text: reply }]);
+    } catch (e) {
+      // Fallback to local FAQ if backend unavailable
+      const fallback = findLocalAnswer(text);
+      setMessages((m) => [...m, { from: "bot", text: fallback }]);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onSubmit = (e) => {
     e.preventDefault();
-    ask(input);
+    const value = input;
     setInput("");
+    ask(value);
   };
 
   if (!open) return null;
@@ -462,7 +584,9 @@ function FAQChatbot({ open, onClose }) {
                   </div>
                   <div
                     className="prose prose-invert prose-p:my-0"
-                    dangerouslySetInnerHTML={{ __html: m.text.split("\n").map(md).join("<br/>") }}
+                    dangerouslySetInnerHTML={{
+                      __html: m.text.split("\n").map(md).join("<br/>"),
+                    }}
                   />
                 </div>
               </div>
@@ -471,17 +595,20 @@ function FAQChatbot({ open, onClose }) {
 
           {/* quick chips */}
           <div className="mt-3 grid grid-cols-2 gap-2">
-            {["How do I create an event?", "How can I join a club?", "Do you support role-based access control?", "Is login secure?"].map(
-              (q) => (
-                <button
-                  key={q}
-                  onClick={() => ask(q)}
-                  className="truncate rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-left text-xs text-white/80 hover:bg-white/[0.08]"
-                >
-                  {q}
-                </button>
-              )
-            )}
+            {[
+              "How do I create an event?",
+              "How can I join a club?",
+              "Do you support role-based access control?",
+              "Is login secure?",
+            ].map((q) => (
+              <button
+                key={q}
+                onClick={() => ask(q)}
+                className="truncate rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-left text-xs text-white/80 hover:bg-white/[0.08]"
+              >
+                {q}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -490,14 +617,11 @@ function FAQChatbot({ open, onClose }) {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question…"
-            className="flex-1 rounded-lg bg-neutral-900/70 px-3 py-2 text-sm outline-none placeholder:text-white/40"
+            placeholder={busy ? "Thinking…" : "Ask a question…"}
+            disabled={busy}
+            className="flex-1 rounded-lg bg-neutral-900/70 px-3 py-2 text-sm outline-none placeholder:text-white/40 disabled:opacity-60"
           />
-          <Button
-            type="submit"
-            size="sm"
-            className="bg-teal-400 text-neutral-900 hover:bg-teal-400/90"
-          >
+          <Button type="submit" size="sm" disabled={busy} className="bg-teal-400 text-neutral-900 hover:bg-teal-400/90 disabled:opacity-60">
             <Send className="mr-1 h-4 w-4" />
             Send
           </Button>
