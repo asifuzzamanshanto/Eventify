@@ -15,7 +15,7 @@ const createEvent = async (req, res) => {
       imageUrl,
       capacity,
       status: status || 'Published',
-      createdBy: req.user._id,
+      createdBy: req.user._id,        // IMPORTANT for “mine”
     });
     const createdEvent = await event.save();
     res.status(201).json(createdEvent);
@@ -25,12 +25,23 @@ const createEvent = async (req, res) => {
 };
 
 /* ------------------------------- Read ------------------------------- */
+// Public list: future events only
 const getAllEvents = async (req, res) => {
   try {
-    // Public list: future events only
     const events = await Event.find({ date: { $gte: new Date() } })
       .sort({ date: 1 })
       .populate('createdBy', 'username clubName');
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error: ' + error.message });
+  }
+};
+
+// Organizer/Super Admin: events created by me
+const getMyEvents = async (req, res) => {
+  try {
+    const events = await Event.find({ createdBy: req.user._id })
+      .sort({ createdAt: -1 });
     res.json(events);
   } catch (error) {
     res.status(500).json({ message: 'Server Error: ' + error.message });
@@ -134,14 +145,13 @@ const getEventAttendees = async (req, res) => {
     const event = await Event.findById(req.params.id);
     if (!event) return res.status(404).json({ message: 'Event not found' });
 
-    // Organizer or Super Admin can view
+    // Organizer or Super Admin can view (enforced here)
     const isOwner = req.user && event.createdBy.toString() === req.user._id.toString();
     const isSuper = req.user && req.user.role === 'Super Admin';
     if (!isOwner && !isSuper) {
       return res.status(403).json({ message: 'Not authorized to view attendees for this event.' });
     }
 
-    // Populate user and return registration status
     const regs = await Registration.find({ event: req.params.id })
       .populate('user', 'name username email university avatar');
 
@@ -162,7 +172,7 @@ const getEventAttendees = async (req, res) => {
 };
 
 /* ------------------------------ Banners ----------------------------- */
-// upload/replace event banner (1920x1080 enforced in route)
+// upload/replace event banner (aspect ratio/size handled in route middleware)
 const updateEventBanner = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -184,7 +194,7 @@ const updateEventBanner = async (req, res) => {
       event.imageKitFileId
     );
 
-    event.imageUrl = url;        // used by FE
+    event.imageUrl = url;
     event.imageKitFileId = fileId;
     const saved = await event.save();
 
@@ -195,7 +205,6 @@ const updateEventBanner = async (req, res) => {
 };
 
 /* --------------------------- Certificates --------------------------- */
-// Upload/replace certificate template image
 const uploadCertificateTemplate = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -227,7 +236,6 @@ const uploadCertificateTemplate = async (req, res) => {
   }
 };
 
-// Save field mapping
 const updateCertificateMapping = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -283,6 +291,7 @@ const batchUpdateParticipants = async (req, res) => {
 module.exports = {
   createEvent,
   getAllEvents,
+  getMyEvents,                // <-- export
   getEventById,
   updateEvent,
   deleteEvent,

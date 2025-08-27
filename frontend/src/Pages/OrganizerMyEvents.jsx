@@ -85,7 +85,7 @@ export default function OrganizerMyEvents({ initialEvents, className }) {
       try {
         setLoading(true);
         // returns events created by logged-in organizer
-        const data = await apiJSON("/api/organizers/events");
+        const data = await apiJSON("/api/events/mine");
         if (!abort && Array.isArray(data) && data.length) setEvents(data);
       } catch (e) {
         console.warn("Failed to load organizer events, using fallback:", e);
@@ -257,7 +257,7 @@ function EventCard({ ev, editable, onEdit, onDelete, onParticipants }) {
     >
       <div className="relative">
         <img
-          src={ev.imageUrl}
+          src={ev.imageUrl || "https://img.freepik.com/premium-vector/trendy-event-banner-template_85212-590.jpg"}
           alt={ev.title}
           loading="lazy"
           className="h-40 w-full bg-neutral-900 object-cover"

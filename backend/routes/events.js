@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   createEvent,
   getAllEvents,
+  getMyEvents,               // <-- import
   getEventById,
   updateEvent,
   deleteEvent,
@@ -35,6 +36,7 @@ const isStudent = (req, res, next) => {
 
 /* ----------------------------- Events ---------------------------- */
 router.get('/', getAllEvents);
+router.get('/mine', protect, canManageEvents, getMyEvents);  // <-- new
 router.get('/:id', getEventById);
 
 router.post('/', protect, canManageEvents, createEvent);
@@ -63,7 +65,7 @@ const bannerHandlers = [
 // Primary PATCH route
 router.patch('/:id/banner', ...bannerHandlers);
 
-// Optional POST alias (kept for compatibility; you can remove if not needed)
+// Optional POST alias (compatibility with existing FE calls)
 router.post('/:id/banner', ...bannerHandlers);
 
 /* -------------------------- Certificates ------------------------- */
