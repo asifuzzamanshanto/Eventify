@@ -18,6 +18,7 @@ import Home from "./navbar/Home.jsx";
 import AboutUs from "./navbar/AboutUs.jsx";
 import Club from "./navbar/Club.jsx";
 import EventDetails from "./Pages/EventDetails.jsx";
+import ClubProfile from "./Pages/Club_Profile.jsx";
 
 // Dashboards (layouts that render <Outlet/>)
 import Student from "./dashboard/Student.jsx";

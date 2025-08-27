@@ -1,39 +1,82 @@
+// backend/controllers/userController.js
 const User = require('../models/User');
-const { replaceBuffer } = require('../services/imagekit.service');
 
-const updateClubLogo = async (req, res) => {
+/**
+ * GET /api/users/organizer-clubs?q=&page=&limit=
+ * Public: return Organizer users as "club profiles" for the Clubs page.
+ *
+ * Fields used:
+ *  - clubName, clubLogoUrl, clubWebsite, city, bio
+ *  - Optional extras for display/search: university, email, phoneNumber, fullName, username
+ */
+async function getOrganizerClubs(req, res) {
   try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '12', 10), 1), 100);
+    const q     = (req.query.q || '').trim();
 
-    // Owner organizer or Super Admin
-    if (req.user._id.toString() !== req.params.id && req.user.role !== 'Super Admin') {
-      return res.status(403).json({ message: 'Not authorized' });
-    }
+    const textFilter = q
+      ? {
+          $or: [
+            { clubName:   new RegExp(q, 'i') },
+            { university: new RegExp(q, 'i') },
+            { city:       new RegExp(q, 'i') },
+            { fullName:   new RegExp(q, 'i') },
+            { username:   new RegExp(q, 'i') },
+          ],
+        }
+      : {};
 
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (user.role !== 'Organizer') {
-      return res.status(400).json({ message: 'Club logo is only for Organizer accounts' });
-    }
+    // Add status: 'Approved' if you gate visibility
+    const baseFilter = { role: 'Organizer' /*, status: 'Approved'*/ };
+    const filter = { ...baseFilter, ...textFilter };
 
-    const ext = (req.file.originalname?.split('.').pop() || 'jpg').toLowerCase();
-    const fileName = `user_${user._id}_clublogo.${ext}`;
+    const total = await User.countDocuments(filter);
 
-    const { url, fileId } = await replaceBuffer(
-      req.file.buffer,
-      fileName,
-      '/club-logos',
-      user.clubLogoFileId
-    );
+    const users = await User.find(filter, {
+      clubName:     1,
+      clubLogoUrl:  1,
+      clubWebsite:  1,
+      city:         1,
+      bio:          1,
+      university:   1,
+      email:        1,
+      phoneNumber:  1,
+      fullName:     1,
+      username:     1,
+      createdAt:    1,
+    })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
 
-    user.clubLogoUrl = url;
-    user.clubLogoFileId = fileId;
-    await user.save();
+    // Normalize shape for the frontend cards
+    const data = users.map((u) => ({
+      title:       u.clubName || u.fullName || u.username || 'Organizer',
+      logo:        u.clubLogoUrl || '',
+      url:         u.clubWebsite || '',
+      city:        u.city || '',
+      university:  u.university || '',
+      email:       u.email || '',
+      phone:       u.phoneNumber || '',
+      description: u.bio || '',
+      events:      [], // none for now
+    }));
 
-    res.status(200).json({ clubLogoUrl: user.clubLogoUrl });
+    return res.json({
+      data,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (err) {
-    res.status(400).json({ message: 'Error uploading club logo: ' + err.message });
+    console.error('getOrganizerClubs error:', err);
+    return res.status(500).json({ message: 'Failed to load organizer clubs' });
   }
-};
+}
 
-module.exports = { updateClubLogo };
+module.exports = {
+  getOrganizerClubs,
+};
