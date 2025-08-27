@@ -5,7 +5,7 @@ import React from "react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Users as UsersIcon, Calendar, MapPin, Check } from "lucide-react";
+import { Users as UsersIcon, Calendar, MapPin } from "lucide-react";
 
 /* ------------------------------ API ------------------------------- */
 async function apiJSON(path, options = {}) {
@@ -31,8 +31,8 @@ export default function AllEvents({ className }) {
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState("");
 
-  // who am i? (App stores this in localStorage on load)
-  const [role, setRole] = React.useState(() => {
+  // role (App saves user in localStorage already)
+  const [role] = React.useState(() => {
     try {
       const raw = localStorage.getItem("user");
       return raw ? JSON.parse(raw)?.role : null;
@@ -40,10 +40,10 @@ export default function AllEvents({ className }) {
       return null;
     }
   });
-
-  // registrations for current student (so we can show "Enrolled")
-  const [registeredIds, setRegisteredIds] = React.useState(new Set());
   const isStudent = role === "Student";
+
+  // registrations for the current student (so we can hide enrolled)
+  const [registeredIds, setRegisteredIds] = React.useState(new Set());
 
   React.useEffect(() => {
     let abort = false;
@@ -61,7 +61,7 @@ export default function AllEvents({ className }) {
     return () => { abort = true; };
   }, []);
 
-  // load my upcoming registrations if I'm a student
+  // load my upcoming registrations if I'm a student, so we exclude them
   React.useEffect(() => {
     if (!isStudent) return;
     let abort = false;
@@ -69,7 +69,11 @@ export default function AllEvents({ className }) {
       try {
         const regs = await apiJSON("/api/registrations/mine?scope=upcoming");
         if (abort || !Array.isArray(regs)) return;
-        const ids = new Set(regs.map(r => r?.event?._id || r?.event?.id).filter(Boolean));
+        const ids = new Set(
+          regs
+            .map(r => r?.event?._id || r?._id || r?.event?.id)
+            .filter(Boolean)
+        );
         setRegisteredIds(ids);
       } catch {
         // ignore (403 if not student / not logged in)
@@ -81,17 +85,26 @@ export default function AllEvents({ className }) {
   async function enroll(eventId) {
     try {
       if (!isStudent) {
-        // not logged in as student → send to login
         navigate("/login");
         return;
       }
       await apiJSON(`/api/events/${eventId}/register`, { method: "POST" });
+      // remove from list immediately
+      setEvents(prev => prev.filter(e => (e._id || e.id) !== eventId));
+      // also mark enrolled locally
       setRegisteredIds(prev => new Set(prev).add(eventId));
-      alert("Enrolled successfully!");
+      // ship to My Events (as requested)
+      navigate("/student/myevents");
     } catch (e) {
       alert(e.message || "Failed to enroll.");
     }
   }
+
+  // exclude already-enrolled items for students
+  const visibleEvents = React.useMemo(() => {
+    if (!isStudent) return events;
+    return events.filter(ev => !registeredIds.has(ev._id || ev.id));
+  }, [events, isStudent, registeredIds]);
 
   return (
     <div className={cn("mx-auto w-full max-w-7xl p-4 md:p-8", className)}>
@@ -108,15 +121,14 @@ export default function AllEvents({ className }) {
         <div className="rounded-2xl border border-white/10 bg-red-500/10 p-8 text-center text-red-300">
           {err}
         </div>
-      ) : events.length === 0 ? (
+      ) : visibleEvents.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white/70">
           No events found.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {events.map((ev) => {
+          {visibleEvents.map((ev) => {
             const id = ev._id || ev.id;
-            const enrolled = registeredIds.has(id);
             return (
               <motion.article
                 key={id}
@@ -165,26 +177,14 @@ export default function AllEvents({ className }) {
                     </button>
 
                     {isStudent && (
-                      enrolled ? (
-                        <button
-                          type="button"
-                          disabled
-                          className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30"
-                          title="You are enrolled in this event"
-                        >
-                          <Check className="h-4 w-4" />
-                          Enrolled
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => enroll(id)}
-                          className="inline-flex items-center gap-2 rounded-lg bg-[#7d9dd2]/20 px-3 py-1.5 text-sm text-white ring-1 ring-white/10 hover:bg-[#7d9dd2]/30"
-                          title="Enroll in this event"
-                        >
-                          Enroll
-                        </button>
-                      )
+                      <button
+                        type="button"
+                        onClick={() => enroll(id)}
+                        className="inline-flex items-center gap-2 rounded-lg bg-[#7d9dd2]/20 px-3 py-1.5 text-sm text-white ring-1 ring-white/10 hover:bg-[#7d9dd2]/30"
+                        title="Enroll in this event"
+                      >
+                        Enroll
+                      </button>
                     )}
                   </div>
                 </div>
