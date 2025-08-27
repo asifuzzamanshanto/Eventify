@@ -158,7 +158,7 @@ function AppInner() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="allevents" replace />} />
+            <Route index element={<Navigate to="myprofile" replace />} />
             <Route path="allevents" element={<AllEvents />} />
             <Route path="myevents" element={<MyEvents />} />
             <Route path="myprofile" element={<ProfilePage />} />
@@ -173,7 +173,7 @@ function AppInner() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="myevents" replace />} />
+            <Route index element={<Navigate to="myprofile" replace />} />
             <Route path="allevents" element={<AllEvents />} />
             <Route path="myevents" element={<OrganizerMyEvents />} />
             <Route path="event/:id" element={<OrganizerEventManage />} />
