@@ -19,21 +19,23 @@ import AboutUs from "./navbar/AboutUs.jsx";
 import Club from "./navbar/Club.jsx";
 import EventDetails from "./Pages/EventDetails.jsx";
 
-// Dashboards (layouts that render <Outlet/>)
+// Dashboards
 import Student from "./dashboard/Student.jsx";
 import Organizer from "./dashboard/Organizer.jsx";
 
-// Pages used inside dashboards
+// Pages (shared & role-specific)
 import AllEvents from "./Pages/All_events.jsx";
-import MyEvents from "./Pages/My_events.jsx";
+import MyEvents from "./Pages/My_events.jsx";                 // student’s My Events
+import OrganizerMyEvents from "./Pages/OrganizerMyEvents.jsx"; // organizer’s My Events
+import OrganizerEventManage from "./Pages/OrganizerEventManage.jsx"; // manager (view → edit)
 import CreateEvents from "./Pages/Create_events.jsx";
 import ProfilePage from "./Pages/Profilepage.jsx";
 
-// Super Admin (leave as-is per your note)
+// Super Admin
 import SuperAdmin from "./SuperAdmin/SuperAdmin.jsx";
 import SuperAdminLogin from "./SuperAdmin/SuperAdminLogin.jsx";
 
-// Logout page
+// Logout
 import Logout from "./Pages/Logout.jsx";
 
 function AppInner() {
@@ -42,7 +44,6 @@ function AppInner() {
   const hideGlobalBg =
     path === "/login" || path === "/signup" || path === "/admin-login";
 
-  // Authoritative auth check from server (cookie-based)
   const [me, setMe] = useState({ loading: true, user: null });
 
   useEffect(() => {
@@ -60,7 +61,6 @@ function AppInner() {
         const u = await res.json();
         if (aborted) return;
 
-        // keep localStorage in sync for other parts of the app
         localStorage.setItem("user", JSON.stringify(u));
         if (!localStorage.getItem("token")) localStorage.setItem("token", "cookie");
 
@@ -100,7 +100,6 @@ function AppInner() {
     return children;
   }
 
-  // Keep this exactly as-is for your separate Super Admin portal
   function AdminPortalGate({ children }) {
     if (me.loading) return <PageLoader />;
     if (me.user?.role === "Super Admin") return <Navigate to="/admin" replace />;
@@ -113,13 +112,14 @@ function AppInner() {
 
       <div className="relative z-10">
         <Routes>
-          
+          {/* Public */}
           <Route path="/" element={<Home />} />
           <Route path="/aboutus" element={<AboutUs />} />
           <Route path="/club" element={<Club />} />
           <Route path="/events" element={<AllEvents />} />
+          <Route path="/events/:id" element={<EventDetails />} />
 
-          {/* Auth pages */}
+          {/* Auth */}
           <Route
             path="/login"
             element={
@@ -137,7 +137,7 @@ function AppInner() {
             }
           />
 
-          {/* Super Admin login (kept separate) */}
+          {/* Super Admin login */}
           <Route
             path="/admin-login"
             element={
@@ -173,14 +173,15 @@ function AppInner() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="create-event" replace />} />
+            <Route index element={<Navigate to="myevents" replace />} />
             <Route path="allevents" element={<AllEvents />} />
-            <Route path="myevents" element={<MyEvents />} />
+            <Route path="myevents" element={<OrganizerMyEvents />} />
+            <Route path="event/:id" element={<OrganizerEventManage />} />
             <Route path="create-event" element={<CreateEvents />} />
             <Route path="myprofile" element={<ProfilePage />} />
           </Route>
 
-          {/* Super Admin area (untouched) */}
+          {/* Super Admin area */}
           <Route
             path="/admin"
             element={
