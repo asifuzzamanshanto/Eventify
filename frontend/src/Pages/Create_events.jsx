@@ -2,6 +2,7 @@
 import React from "react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
+import Cropper from "react-easy-crop";
 import { cn } from "@/lib/utils";
 
 const CATEGORIES = [
@@ -12,7 +13,6 @@ const CATEGORIES = [
 ];
 
 export default function CreateEvent({ className }) {
-  // force dark mode for this page
   React.useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
@@ -22,17 +22,23 @@ export default function CreateEvent({ className }) {
   const [form, setForm] = React.useState({
     title: "",
     description: "",
-    date: "",     // yyyy-mm-dd
-    time: "",     // HH:mm (local)
+    date: "",
+    time: "",
     location: "",
     category: "",
-    imageUrl: "",   // optional: if organizer wants to paste a URL instead of uploading
+    imageUrl: "",
     capacity: "",
   });
 
-  // local file state + preview
-  const [file, setFile] = React.useState(null);
-  const [filePreview, setFilePreview] = React.useState("");
+  // local file state + preview + crop
+  const [file, setFile] = React.useState(null);                 // original file
+  const [filePreview, setFilePreview] = React.useState("");     // preview for original or cropped
+  const [croppedBlob, setCroppedBlob] = React.useState(null);   // cropped 1920x1080 blob
+
+  const [showCropper, setShowCropper] = React.useState(false);
+  const [crop, setCrop] = React.useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = React.useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState(null);
 
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -44,7 +50,6 @@ export default function CreateEvent({ className }) {
   };
 
   function toDateISO(dateStr, timeStr) {
-    // Combine local date+time -> Date (default 09:00 if time empty)
     const t = timeStr?.trim() ? timeStr : "09:00";
     const d = new Date(`${dateStr}T${t}`);
     return d.toISOString();
@@ -60,10 +65,12 @@ export default function CreateEvent({ className }) {
     return "";
   };
 
-  // handle file select + preview (PNG/JPG/WEBP)
+  // handle file select (PNG/JPG/WEBP), 10MB limit
   const onFileChange = (e) => {
     const f = e.target.files?.[0];
     setError("");
+    setCroppedBlob(null);
+
     if (!f) {
       setFile(null);
       if (filePreview) URL.revokeObjectURL(filePreview);
@@ -75,18 +82,47 @@ export default function CreateEvent({ className }) {
       e.target.value = "";
       return;
     }
-    // revoke old preview before replacing
+    if (f.size > 10 * 1024 * 1024) {
+      setError("Max size 10 MB.");
+      e.target.value = "";
+      return;
+    }
     if (filePreview) URL.revokeObjectURL(filePreview);
     setFile(f);
     setFilePreview(URL.createObjectURL(f));
+    setShowCropper(true); // open cropper immediately
   };
 
   React.useEffect(() => {
-    // cleanup preview URL on unmount
     return () => {
       if (filePreview) URL.revokeObjectURL(filePreview);
     };
   }, [filePreview]);
+
+  const onCropComplete = React.useCallback((_, pixels) => {
+    setCroppedAreaPixels(pixels);
+  }, []);
+
+  async function confirmCrop() {
+    try {
+      if (!filePreview || !croppedAreaPixels) return;
+      const blob = await cropToBlob(filePreview, croppedAreaPixels, 1920, 1080);
+      setCroppedBlob(blob);
+      // update preview to cropped result
+      const url = URL.createObjectURL(blob);
+      if (filePreview) URL.revokeObjectURL(filePreview);
+      setFilePreview(url);
+      setShowCropper(false);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to crop. Try another image.");
+    }
+  }
+
+  function cancelCrop() {
+    // keep original preview but close cropper
+    setShowCropper(false);
+  }
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -102,18 +138,17 @@ export default function CreateEvent({ className }) {
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
-      date: toDateISO(form.date, form.time),   // matches schema `Date`
+      date: toDateISO(form.date, form.time),
       location: form.location.trim(),
       category: form.category,
-      imageUrl: form.imageUrl.trim(),          // optional direct URL path still supported
+      imageUrl: form.imageUrl.trim(),
       capacity: form.capacity ? Number(form.capacity) : undefined,
-      // createdBy is set by backend (from auth); do NOT send from the client.
     };
 
     try {
       setSubmitting(true);
 
-      // 1) Create the event (cookie-based auth)
+      // 1) Create the event
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,39 +157,40 @@ export default function CreateEvent({ className }) {
       });
 
       if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error("Your session has expired. Please log in again.");
-        }
+        if (res.status === 401) throw new Error("Your session has expired. Please log in again.");
         const msg = await res.text();
         throw new Error(msg || "Failed to create event.");
       }
 
       const created = await res.json();
 
-      // 2) If a file was chosen, upload banner to /api/events/:id/banner
+      // 2) Upload cropped banner (PATCH /:id/banner). If user selected a file, we enforce cropping.
       if (file) {
+        // If user never confirmed crop, do a last-second crop with current crop box.
+        let blobToSend = croppedBlob;
+        if (!blobToSend) {
+          // auto crop using entire image with 16:9 center if no pixels yet
+          const pixels = croppedAreaPixels || await autoCenterCropPixels(filePreview, 16 / 9);
+          blobToSend = await cropToBlob(filePreview, pixels, 1920, 1080);
+        }
+
         const fd = new FormData();
-        // IMPORTANT: field name must match upload.single('banner') on the server
-        fd.append("banner", file);
+        fd.append("banner", new File([blobToSend], "banner.jpg", { type: "image/jpeg" }));
 
         const up = await fetch(`/api/events/${created._id}/banner`, {
-          method: "POST",
+          method: "PATCH",                 // IMPORTANT: must match backend route
           credentials: "include",
           body: fd,
         });
 
         if (!up.ok) {
-          if (up.status === 401) {
-            throw new Error("Your session has expired. Please log in again.");
-          }
+          if (up.status === 401) throw new Error("Your session has expired. Please log in again.");
           const umsg = await up.text();
-          // event exists; we only surface banner upload failure
           throw new Error(umsg || "Event created, but banner upload failed.");
         }
       }
 
       setSuccess("Event created successfully!");
-      // Navigate organizer to My Events (matches your sidebar link)
       setTimeout(() => navigate("/organizers/myevents"), 900);
     } catch (err) {
       setError(err.message || "Something went wrong.");
@@ -164,12 +200,7 @@ export default function CreateEvent({ className }) {
   };
 
   return (
-    <div
-      className={cn(
-        "dark relative z-10 mx-auto w-full max-w-4xl p-4 md:p-8",
-        className
-      )}
-    >
+    <div className={cn("dark relative z-10 mx-auto w-full max-w-4xl p-4 md:p-8", className)}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-white">Create Event</h1>
@@ -278,7 +309,6 @@ export default function CreateEvent({ className }) {
             />
           </div>
 
-          {/* Optional: paste an image URL */}
           <div>
             <label className="mb-1 block text-xs font-medium text-white/70">Image URL (optional)</label>
             <input
@@ -294,7 +324,7 @@ export default function CreateEvent({ className }) {
           {/* File upload */}
           <div>
             <label className="mb-1 block text-xs font-medium text-white/70">
-              Upload Banner (1920×1080 JPG/PNG/WEBP)
+              Upload Banner (crop to 16:9, 10MB max)
             </label>
             <input
               type="file"
@@ -304,7 +334,7 @@ export default function CreateEvent({ className }) {
             />
           </div>
 
-          {/* Preview (uploaded file takes priority; else URL) */}
+          {/* Preview */}
           {(filePreview || form.imageUrl) ? (
             <div className="md:col-span-2">
               <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
@@ -353,6 +383,99 @@ export default function CreateEvent({ className }) {
           </button>
         </div>
       </motion.form>
+
+      {/* Cropper Modal */}
+      {showCropper && filePreview && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-neutral-900 ring-1 ring-white/10">
+            <div className="relative aspect-[16/9] w-full">
+              <Cropper
+                image={filePreview}
+                crop={crop}
+                zoom={zoom}
+                aspect={16 / 9}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 p-3">
+              <button
+                onClick={cancelCrop}
+                className="rounded-lg bg-white/10 px-3 py-1.5 text-sm ring-1 ring-white/10 hover:bg-white/15"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCrop}
+                className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-sm text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-500/30"
+              >
+                Confirm Crop
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+/* ----------------------------- helpers ----------------------------- */
+
+function autoCenterCropPixels(previewURL, targetRatio) {
+  // Fallback: center-crop to desired ratio if user didn't interact
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+      const current = width / height;
+      if (Math.abs(current - targetRatio) < 1e-3) {
+        return resolve({ x: 0, y: 0, width, height });
+      }
+      if (current > targetRatio) {
+        // too wide → trim sides
+        const newW = height * targetRatio;
+        const x = (width - newW) / 2;
+        resolve({ x, y: 0, width: newW, height });
+      } else {
+        // too tall → trim top/bottom
+        const newH = width / targetRatio;
+        const y = (height - newH) / 2;
+        resolve({ x: 0, y, width, height: newH });
+      }
+    };
+    img.onerror = reject;
+    img.src = previewURL;
+  });
+}
+
+function cropToBlob(imageSrc, cropPixels, outW, outH) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(
+        img,
+        cropPixels.x,
+        cropPixels.y,
+        cropPixels.width,
+        cropPixels.height,
+        0,
+        0,
+        outW,
+        outH
+      );
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Canvas toBlob failed"))),
+        "image/jpeg",
+        0.92
+      );
+    };
+    img.onerror = reject;
+    img.src = imageSrc;
+  });
 }

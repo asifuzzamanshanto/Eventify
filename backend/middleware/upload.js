@@ -1,14 +1,15 @@
 const multer = require('multer');
 
-function makeUploader(maxBytes) {
+function makeUploader(maxSizeBytes) {
+  const storage = multer.memoryStorage();
   return multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: maxBytes },
+    storage,
+    limits: { fileSize: maxSizeBytes },
     fileFilter: (req, file, cb) => {
-      const ok = /^image\/(jpeg|png|webp)$/.test(file.mimetype);
-      if (!ok) return cb(new Error('Only JPEG/PNG/WebP images are allowed'), false);
-      cb(null, true);
-    }
+      // allow common image mimetypes; adjust if you need PDFs, etc.
+      if (/^image\/(png|jpe?g|webp|gif|bmp)$/i.test(file.mimetype)) return cb(null, true);
+      cb(new Error('Unsupported file type'));
+    },
   });
 }
 

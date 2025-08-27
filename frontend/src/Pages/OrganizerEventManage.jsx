@@ -1,4 +1,3 @@
-// frontend/src/Pages/OrganizerEventManage.jsx
 "use client";
 
 import React from "react";
@@ -21,15 +20,12 @@ import {
 import { cn } from "@/lib/utils";
 
 /* ------------------------------ API ------------------------------- */
-// Adjust endpoints if yours differ.
 async function apiJSON(path, options = {}) {
   const res = await fetch(path, {
     credentials: "include",
     headers: {
       Accept: "application/json",
-      ...(options.body instanceof FormData
-        ? {}
-        : { "Content-Type": "application/json" }),
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {}),
     },
     ...options,
@@ -41,8 +37,9 @@ async function apiJSON(path, options = {}) {
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
-async function uploadForm(path, form) {
-  return apiJSON(path, { method: "POST", body: form });
+async function uploadFormPATCH(path, form) {
+  // PATCH helper for FormData bodies
+  return apiJSON(path, { method: "PATCH", body: form });
 }
 async function patchJSON(path, body) {
   return apiJSON(path, { method: "PATCH", body: JSON.stringify(body) });
@@ -52,39 +49,41 @@ async function putJSON(path, body) {
 }
 
 /** ------------------------------------------------------------------
- * Page: OrganizerEventManage (view → edit)
- * - Loads event from backend
- * - Saves edits
- * - Uploads cropped banner only when changed
- * - Certificates tab: upload template + save mapping (PER EVENT)
+ * OrganizerEventManage (view → edit)
  * ------------------------------------------------------------------*/
 export default function OrganizerEventManage({ className }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { state } = useLocation(); // maybe { event }
+  const { state } = useLocation();
   const [event, setEvent] = React.useState(state?.event || null);
   const [loading, setLoading] = React.useState(!state?.event);
   const [err, setErr] = React.useState("");
 
-  // Tabs: "overview" | "participants" | "certificates"
+  // tabs
   const [tab, setTab] = React.useState("overview");
 
-  // Edit mode state
+  // edit state
   const [isEditing, setIsEditing] = React.useState(false);
-  const [draft, setDraft] = React.useState(() =>
-    pickEditable(state?.event || {})
-  );
+  const [draft, setDraft] = React.useState(() => pickEditable(state?.event || {}));
 
-  // Banner upload + crop
+  // banner crop
   const [bannerSrc, setBannerSrc] = React.useState("");
   const [croppedBannerURL, setCroppedBannerURL] = React.useState(null);
   const [crop, setCrop] = React.useState({ x: 0, y: 0 });
   const [zoom, setZoom] = React.useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = React.useState(null);
 
+  // participants (for this page’s tab)
+  const [attendees, setAttendees] = React.useState([]);
+  const [profile, setProfile] = React.useState(null);
+  const [selectedIds, setSelectedIds] = React.useState(new Set());
+
   React.useEffect(() => {
     let abort = false;
-    if (state?.event) return; // already hydrated
+    if (state?.event) {
+      setDraft(pickEditable(state.event));
+      return;
+    }
     (async () => {
       try {
         setLoading(true);
@@ -104,6 +103,29 @@ export default function OrganizerEventManage({ className }) {
     };
   }, [id, state?.event]);
 
+  // load attendees when switching to participants tab
+  React.useEffect(() => {
+    if (tab !== "participants") return;
+    (async () => {
+      try {
+        const data = await apiJSON(`/api/events/${id}/attendees`);
+        const rows = Array.isArray(data)
+          ? data.map((u) => ({
+              id: u.id || u._id,
+              name: u.name || u.username,
+              username: u.username,
+              avatar: u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${u.username}`,
+              done: (u.status || "").toLowerCase() === "completed",
+            }))
+          : [];
+        setAttendees(rows);
+      } catch (e) {
+        console.warn("Failed to load attendees:", e);
+        setAttendees([]);
+      }
+    })();
+  }, [tab, id]);
+
   function startEdit() {
     setIsEditing(true);
     setDraft(pickEditable(event || {}));
@@ -121,23 +143,24 @@ export default function OrganizerEventManage({ className }) {
 
   async function saveEdit() {
     try {
-      // 1) Save core fields
-      const updated = await putJSON(`/api/events/${id}`, {
+      // 1) core fields → ISO date
+      const dateISO = draft.date ? new Date(draft.date).toISOString() : null;
+      await putJSON(`/api/events/${id}`, {
         title: draft.title,
-        date: draft.date,
+        date: dateISO,
         location: draft.location,
         description: draft.description,
       });
 
-      // 2) If banner changed (user uploaded & cropped), upload separately
+      // 2) banner if changed — must use PATCH to match backend
       if (croppedBannerURL) {
         const blob = await fetch(croppedBannerURL).then((r) => r.blob());
         const form = new FormData();
-        form.append("banner", blob, "banner.jpg"); // server must enforce 16:9 & ≤10MB
-        await uploadForm(`/api/events/${id}/banner`, form);
+        form.append("banner", blob, "banner.jpg");
+        await uploadFormPATCH(`/api/events/${id}/banner`, form);
       }
 
-      // 3) Refresh event
+      // 3) refresh
       const fresh = await apiJSON(`/api/events/${id}`);
       setEvent(fresh);
       setIsEditing(false);
@@ -172,7 +195,7 @@ export default function OrganizerEventManage({ className }) {
   }, []);
   async function confirmCrop() {
     try {
-      const cropped = await getCroppedImg(bannerSrc, croppedAreaPixels);
+      const cropped = await getCroppedImg(bannerSrc, croppedAreaPixels); // 1920x1080 out
       setCroppedBannerURL(cropped);
     } catch (e) {
       console.error(e);
@@ -180,9 +203,7 @@ export default function OrganizerEventManage({ className }) {
     }
   }
 
-  // Participants selection (for quick actions inside this page if needed later)
-  const [profile, setProfile] = React.useState(null);
-  const [selectedIds, setSelectedIds] = React.useState(new Set());
+  // participant selection + batch
   function toggleSelect(id) {
     setSelectedIds((prev) => {
       const n = new Set(prev);
@@ -191,7 +212,7 @@ export default function OrganizerEventManage({ className }) {
     });
   }
   function toggleAllParticipants() {
-    const allIds = (event?.participants || []).map((p) => p.id);
+    const allIds = attendees.map((p) => p.id);
     const allSelected = selectedIds.size === allIds.length && allIds.length > 0;
     setSelectedIds(allSelected ? new Set() : new Set(allIds));
   }
@@ -202,9 +223,18 @@ export default function OrganizerEventManage({ className }) {
         method: "POST",
         body: JSON.stringify({ action, userIds: [...selectedIds] }),
       });
-      // optional: refresh event if it carries participants on this payload
-      const fresh = await apiJSON(`/api/events/${id}`);
-      setEvent(fresh);
+      // reload attendees
+      const data = await apiJSON(`/api/events/${id}/attendees`);
+      const rows = Array.isArray(data)
+        ? data.map((u) => ({
+            id: u.id || u._id,
+            name: u.name || u.username,
+            username: u.username,
+            avatar: u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${u.username}`,
+            done: (u.status || "").toLowerCase() === "completed",
+          }))
+        : [];
+      setAttendees(rows);
       setSelectedIds(new Set());
     } catch (e) {
       alert(e.message || "Failed to update participants.");
@@ -223,9 +253,7 @@ export default function OrganizerEventManage({ className }) {
   }
 
   if (loading) {
-    return (
-      <div className="grid min-h-[40vh] place-items-center text-white/70">Loading…</div>
-    );
+    return <div className="grid min-h-[40vh] place-items-center text-white/70">Loading…</div>;
   }
   if (err || !event) {
     return (
@@ -297,7 +325,7 @@ export default function OrganizerEventManage({ className }) {
       <div className="mb-6 overflow-hidden rounded-2xl ring-1 ring-white/10">
         {!isEditing || (!bannerSrc && !croppedBannerURL) ? (
           <img
-            src={event.banner}
+            src={event.imageUrl || "https://placehold.co/1600x900?text=Event+Banner"}
             alt={event.title}
             className="h-[260px] w-full object-cover sm:h-[360px]"
           />
@@ -379,7 +407,7 @@ export default function OrganizerEventManage({ className }) {
 
       {tab === "participants" && (
         <ParticipantsPanel
-          participants={event.participants || []}
+          participants={attendees}
           selectedIds={selectedIds}
           toggleSelect={toggleSelect}
           toggleAll={toggleAllParticipants}
@@ -392,9 +420,11 @@ export default function OrganizerEventManage({ className }) {
       {tab === "certificates" && (
         <CertificatesPanel
           eventId={id}
-          existing={event.certificate || { templateSrc: "", mapping: {} }}
+          existing={{
+            templateSrc: event.certificateTemplateUrl || "",
+            mapping: event.certificateMapping || {},
+          }}
           onSaved={async () => {
-            // refresh to reflect saved mapping/template
             const fresh = await apiJSON(`/api/events/${id}`);
             setEvent(fresh);
             alert("Certificate settings saved.");
@@ -451,7 +481,7 @@ function OverviewPanel({ isEditing, draft, onChange, event }) {
             <InfoBox label="Title" value={event.title} />
             <InfoBox label="Date & Time" value={formatDateTime(event.date)} />
             <InfoBox label="Location" value={event.location} />
-            <InfoBox label "Status" value={event.status} />
+            <InfoBox label="Status" value={event.status || "—"} />
           </div>
           <div className="mt-4">
             <h3 className="mb-1 text-sm font-semibold">Description</h3>
@@ -602,54 +632,50 @@ function ParticipantsPanel({
 }
 
 /** ------------------------------------------------------------------
- * Certificates Panel (Upload template + map fields only)
- * Backed endpoints:
- *   POST   /api/events/:id/certificate-template   (FormData { template })
- *   PATCH  /api/events/:id/certificate-mapping   (JSON { mapping })
+ * Certificates Panel (upload template + map fields only)
  * ------------------------------------------------------------------*/
 function CertificatesPanel({ eventId, existing, onSaved, sampleData }) {
+  const DEFAULT_MAPPING = {
+    name:        { x: 50, y: 50, w: 40, font: 22, align: "center", visible: true },
+    institution: { x: 50, y: 60, w: 40, font: 16, align: "center", visible: true },
+    eventName:   { x: 50, y: 70, w: 40, font: 16, align: "center", visible: true },
+    eventDate:   { x: 50, y: 78, w: 30, font: 14, align: "center", visible: true },
+  };
+
   const [templateSrc, setTemplateSrc] = React.useState(existing?.templateSrc || "");
-  const [mapping, setMapping] = React.useState(
-    existing?.mapping || {
-      name:        { x: 50, y: 50, w: 40, font: 22, align: "center", visible: true },
-      institution: { x: 50, y: 60, w: 40, font: 16, align: "center", visible: true },
-      eventName:   { x: 50, y: 70, w: 40, font: 16, align: "center", visible: true },
-      eventDate:   { x: 50, y: 78, w: 30, font: 14, align: "center", visible: true },
-    }
-  );
+  const [mapping, setMapping] = React.useState(() => {
+    const ex = existing?.mapping || {};
+    return {
+      name:        { ...DEFAULT_MAPPING.name,        ...(ex.name || {}) },
+      institution: { ...DEFAULT_MAPPING.institution, ...(ex.institution || {}) },
+      eventName:   { ...DEFAULT_MAPPING.eventName,   ...(ex.eventName || {}) },
+      eventDate:   { ...DEFAULT_MAPPING.eventDate,   ...(ex.eventDate || {}) },
+    };
+  });
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState("");
 
   async function handleTemplateUpload(e) {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!f.type.startsWith("image/")) {
-      setErr("Please upload an image (PNG/JPG).");
-      return;
-    }
-    if (f.size > 10 * 1024 * 1024) {
-      setErr("Max size 10 MB.");
-      return;
-    }
+    if (!f.type.startsWith("image/")) return setErr("Please upload an image (PNG/JPG).");
+    if (f.size > 10 * 1024 * 1024) return setErr("Max size 10 MB.");
     setErr("");
 
     try {
       setBusy(true);
       const form = new FormData();
       form.append("template", f);
-      const res = await uploadForm(`/api/events/${eventId}/certificate-template`, form);
-      // EXPECTED: { url: "https://..." }
-      const url = res?.url || URL.createObjectURL(f);
-      setTemplateSrc(url);
+      const res = await apiJSON(`/api/events/${eventId}/certificate-template`, {
+        method: "POST",
+        body: form,
+      });
+      setTemplateSrc(res?.url || URL.createObjectURL(f));
     } catch (e2) {
       setErr(e2.message || "Failed to upload template.");
     } finally {
       setBusy(false);
     }
-  }
-
-  function setField(key, patch) {
-    setMapping((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   }
 
   async function saveMapping() {
@@ -671,6 +697,14 @@ function CertificatesPanel({ eventId, existing, onSaved, sampleData }) {
     { key: "eventDate", label: "Event Date", sample: sampleData.eventDate },
   ];
   const [activeField, setActiveField] = React.useState("name");
+  const current = mapping[activeField] || DEFAULT_MAPPING[activeField];
+
+  function setField(key, patch) {
+    setMapping((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || DEFAULT_MAPPING[key]), ...patch },
+    }));
+  }
 
   return (
     <motion.section
@@ -712,11 +746,11 @@ function CertificatesPanel({ eventId, existing, onSaved, sampleData }) {
               </div>
             )}
 
-            {/* overlays */}
             {templateSrc &&
               fields.map(({ key, label, sample }) => {
-                const m = mapping[key];
-                if (!m?.visible) return null;
+                const base = DEFAULT_MAPPING[key];
+                const m = mapping[key] ? { ...base, ...mapping[key] } : base;
+                if (!m.visible) return null;
                 const style = {
                   left: `${m.x}%`,
                   top: `${m.y}%`,
@@ -738,7 +772,8 @@ function CertificatesPanel({ eventId, existing, onSaved, sampleData }) {
               })}
           </div>
           <p className="mt-2 text-xs text-white/60">
-            Overlays show sample text only. Certificates are generated on your server after organizers mark participants as completed.
+            Overlays show sample text only. Mapping is saved to this event; different events can have
+            different templates & mappings.
           </p>
         </div>
 
@@ -764,10 +799,8 @@ function CertificatesPanel({ eventId, existing, onSaved, sampleData }) {
           </div>
 
           <FieldControls
-            value={mapping[activeField]}
-            onChange={(patch) =>
-              setMapping((prev) => ({ ...prev, [activeField]: { ...prev[activeField], ...patch } }))
-            }
+            value={current}
+            onChange={(patch) => setField(activeField, patch)}
           />
 
           <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
@@ -775,13 +808,8 @@ function CertificatesPanel({ eventId, existing, onSaved, sampleData }) {
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={mapping[activeField].visible}
-                onChange={(e) =>
-                  setMapping((prev) => ({
-                    ...prev,
-                    [activeField]: { ...prev[activeField], visible: e.target.checked },
-                  }))
-                }
+                checked={!!current.visible}
+                onChange={(e) => setField(activeField, { visible: e.target.checked })}
               />
               <span className="text-sm">Show this field</span>
             </div>
@@ -885,10 +913,26 @@ function InfoBox({ label, value }) {
 function pickEditable(e) {
   return {
     title: e?.title || "",
-    date: e?.date || "",
+    date: e?.date ? toDatetimeLocal(e.date) : "",
     location: e?.location || "",
     description: e?.description || "",
   };
+}
+
+function toDatetimeLocal(isoLike) {
+  try {
+    const d = new Date(isoLike);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  } catch {
+    return "";
+  }
 }
 
 function formatDateTime(iso) {
@@ -906,15 +950,19 @@ function formatDateTime(iso) {
   }
 }
 
-/** Canvas crop helper — returns a blob URL JPEG */
+/** Canvas crop helper — returns a blob URL JPEG (scaled to 1920x1080) */
 async function getCroppedImg(imageSrc, cropPixels) {
   const image = await createImage(imageSrc);
+  const W = 1920;
+  const H = 1080;
+
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
-  canvas.width = cropPixels.width;
-  canvas.height = cropPixels.height;
+  canvas.width = W;
+  canvas.height = H;
 
+  // Draw the selected area scaled into 1920x1080
   ctx.drawImage(
     image,
     cropPixels.x,
@@ -923,15 +971,19 @@ async function getCroppedImg(imageSrc, cropPixels) {
     cropPixels.height,
     0,
     0,
-    cropPixels.width,
-    cropPixels.height
+    W,
+    H
   );
 
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      resolve(url);
-    }, "image/jpeg", 0.92);
+    canvas.toBlob(
+      (blob) => {
+        const url = URL.createObjectURL(blob);
+        resolve(url);
+      },
+      "image/jpeg",
+      0.92
+    );
   });
 }
 

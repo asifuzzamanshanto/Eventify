@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
-  Info as InfoIcon,
   Users as UsersIcon,
   PencilLine,
   Trash2,
@@ -17,15 +16,12 @@ import {
 } from "lucide-react";
 
 /* ------------------------------ API ------------------------------- */
-// Adjust endpoints if yours differ.
 async function apiJSON(path, options = {}) {
   const res = await fetch(path, {
     credentials: "include",
     headers: {
       Accept: "application/json",
-      ...(options.body instanceof FormData
-        ? {}
-        : { "Content-Type": "application/json" }),
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers || {}),
     },
     ...options,
@@ -34,42 +30,38 @@ async function apiJSON(path, options = {}) {
     const msg = await res.text().catch(() => "");
     throw new Error(msg || `Request failed: ${res.status}`);
   }
-  // some DELETEs may return 204
   const text = await res.text();
   return text ? JSON.parse(text) : null;
 }
 
-/* fallback if backend is empty (will be replaced once /api returns data) */
+/* fallback if backend returns empty during early dev */
 const SAMPLE_EVENTS = [
   {
     id: "org-201",
     title: "Open Source Summit",
     date: "2025-09-18",
     location: "IUT Auditorium",
-    banner:
+    imageUrl:
       "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?q=80&w=1600&auto=format&fit=crop",
     status: "Published",
-    participantsCount: 3,
   },
   {
     id: "org-202",
     title: "DevOps Day",
     date: "2025-07-12",
     location: "BRACU UB3",
-    banner:
+    imageUrl:
       "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?q=80&w=1600&auto=format&fit=crop",
     status: "Published",
-    participantsCount: 1,
   },
   {
     id: "org-203",
     title: "AI Bootcamp (Spring)",
     date: "2025-03-03",
     location: "NSU SAC",
-    banner:
+    imageUrl:
       "https://images.unsplash.com/photo-1531297484001-80022131f5a1?q=80&w=1600&auto=format&fit=crop",
     status: "Archived",
-    participantsCount: 0,
   },
 ];
 
@@ -82,9 +74,7 @@ export default function OrganizerMyEvents({ initialEvents, className }) {
   const [loading, setLoading] = React.useState(true);
   const [events, setEvents] = React.useState(() => {
     const arr =
-      Array.isArray(initialEvents) && initialEvents.length
-        ? initialEvents
-        : SAMPLE_EVENTS;
+      Array.isArray(initialEvents) && initialEvents.length ? initialEvents : SAMPLE_EVENTS;
     return [...arr];
   });
 
@@ -94,7 +84,7 @@ export default function OrganizerMyEvents({ initialEvents, className }) {
     (async () => {
       try {
         setLoading(true);
-        // EXPECTED: returns [{ id, title, date, location, banner, status, participantsCount }]
+        // returns events created by logged-in organizer
         const data = await apiJSON("/api/organizers/events");
         if (!abort && Array.isArray(data) && data.length) setEvents(data);
       } catch (e) {
@@ -141,14 +131,14 @@ export default function OrganizerMyEvents({ initialEvents, className }) {
     if (!confirm("Delete this event? This cannot be undone.")) return;
     try {
       await apiJSON(`/api/events/${id}`, { method: "DELETE" });
-      setEvents((prev) => prev.filter((e) => e.id !== id));
+      setEvents((prev) => prev.filter((e) => e.id !== id && e._id !== id));
     } catch (e) {
       alert(e.message || "Failed to delete.");
     }
   }
 
   const goManage = (ev) =>
-    navigate(`/organizers/event/${ev.id}`, { state: { event: ev } });
+    navigate(`/organizers/event/${ev.id || ev._id}`, { state: { event: ev } });
 
   return (
     <div className={cn("mx-auto w-full max-w-7xl p-4 md:p-8", className)}>
@@ -207,12 +197,14 @@ export default function OrganizerMyEvents({ initialEvents, className }) {
             <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {upcoming.map((ev) => (
                 <EventCard
-                  key={ev.id}
+                  key={ev.id || ev._id}
                   ev={ev}
                   editable
                   onEdit={() => goManage(ev)}
-                  onDelete={() => handleDelete(ev.id)}
-                  onParticipants={() => openParticipants({ id: ev.id, title: ev.title })}
+                  onDelete={() => handleDelete(ev.id || ev._id)}
+                  onParticipants={() =>
+                    openParticipants({ id: ev.id || ev._id, title: ev.title })
+                  }
                 />
               ))}
             </div>
@@ -226,12 +218,14 @@ export default function OrganizerMyEvents({ initialEvents, className }) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {past.map((ev) => (
                 <EventCard
-                  key={ev.id}
+                  key={ev.id || ev._id}
                   ev={ev}
                   editable={false}
                   onEdit={() => {}}
-                  onDelete={() => handleDelete(ev.id)}
-                  onParticipants={() => openParticipants({ id: ev.id, title: ev.title })}
+                  onDelete={() => handleDelete(ev.id || ev._id)}
+                  onParticipants={() =>
+                    openParticipants({ id: ev.id || ev._id, title: ev.title })
+                  }
                 />
               ))}
             </div>
@@ -263,7 +257,7 @@ function EventCard({ ev, editable, onEdit, onDelete, onParticipants }) {
     >
       <div className="relative">
         <img
-          src={ev.banner}
+          src={ev.imageUrl}
           alt={ev.title}
           loading="lazy"
           className="h-40 w-full bg-neutral-900 object-cover"
@@ -368,12 +362,36 @@ function ParticipantsDrawer() {
     };
   }, []);
 
+  async function apiJSON(path, options = {}) {
+    const res = await fetch(path, {
+      credentials: "include",
+      headers: { Accept: "application/json", ...(options.headers || {}) },
+      ...options,
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      throw new Error(msg || `Request failed: ${res.status}`);
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+
   async function load(id) {
     try {
       setLoading(true);
-      // EXPECTED: returns [{id, name, username, avatar, status}]
-      const data = await apiJSON(`/api/events/${id}/participants`);
-      setList(Array.isArray(data) ? data : []);
+      // your backend uses /attendees
+      const data = await apiJSON(`/api/events/${id}/attendees`);
+      // Normalize shape
+      const rows = Array.isArray(data)
+        ? data.map((u) => ({
+            id: u._id || u.id,
+            name: u.name || u.username,
+            username: u.username,
+            avatar: u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${u.username}`,
+            status: u.status || "registered",
+          }))
+        : [];
+      setList(rows);
     } catch (e) {
       console.warn("Failed to load participants:", e);
       setList([]);
@@ -403,6 +421,7 @@ function ParticipantsDrawer() {
     try {
       await apiJSON(`/api/events/${eventId}/participants/batch`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, userIds: [...selected] }),
       });
       await load(eventId);
@@ -480,7 +499,7 @@ function ParticipantsDrawer() {
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium text-white">{p.name}</span>
                       <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60 ring-1 ring-white/15">
-                        {p.status || "Registered"}
+                        {p.status}
                       </span>
                     </div>
                     <div className="truncate text-xs text-white/60">@{p.username}</div>
@@ -537,7 +556,7 @@ function formatDate(iso) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Small presentational components                                     */
+/* UI bits                                                             */
 /* ------------------------------------------------------------------ */
 function SectionTitle({ title, count }) {
   return (
